@@ -1,3 +1,13 @@
+// Proxy support:
+// - WebSocket proxy is handled by proxy-preload.cjs (loaded via NODE_OPTIONS)
+// - REST proxy (undici) is configured here for discord.js fetch-based requests
+import { setGlobalDispatcher, ProxyAgent as UndiciProxyAgent } from 'undici';
+
+const httpProxy = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+if (httpProxy) {
+  setGlobalDispatcher(new UndiciProxyAgent(httpProxy));
+}
+
 import fs from 'fs';
 import path from 'path';
 

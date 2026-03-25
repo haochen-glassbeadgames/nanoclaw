@@ -10,9 +10,10 @@
  *             Proxy injects real OAuth token on that exchange request;
  *             subsequent requests carry the temp key which is valid as-is.
  */
-import { createServer, Server } from 'http';
-import { request as httpsRequest } from 'https';
+import { createServer, Agent as HttpAgent, Server } from 'http';
+import { request as httpsRequest, Agent as HttpsAgent } from 'https';
 import { request as httpRequest, RequestOptions } from 'http';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 import { readEnvFile } from './env.js';
 import { logger } from './logger.js';
@@ -43,6 +44,13 @@ export function startCredentialProxy(
   );
   const isHttps = upstreamUrl.protocol === 'https:';
   const makeRequest = isHttps ? httpsRequest : httpRequest;
+
+  // Route upstream requests through HTTP proxy if configured.
+  // Uses HTTP CONNECT tunneling so the proxy sees the domain for rule-based routing.
+  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+  const upstreamAgent: HttpAgent | HttpsAgent | undefined = proxyUrl
+    ? new HttpsProxyAgent(proxyUrl)
+    : undefined;
 
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
@@ -86,6 +94,7 @@ export function startCredentialProxy(
             path: req.url,
             method: req.method,
             headers,
+            agent: upstreamAgent,
           } as RequestOptions,
           (upRes) => {
             res.writeHead(upRes.statusCode!, upRes.headers);

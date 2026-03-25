@@ -11,23 +11,43 @@ import { logger } from './logger.js';
 /** The container runtime binary name. */
 export const CONTAINER_RUNTIME_BIN = 'container';
 
-/** Hostname containers use to reach the host machine. */
-export const CONTAINER_HOST_GATEWAY = 'host.docker.internal';
+/**
+ * IP address containers use to reach the host machine.
+ * Apple Container uses a VirtioFS VM with a bridge network — containers
+ * reach the host at the gateway IP (192.168.64.1), not host.docker.internal.
+ */
+export const CONTAINER_HOST_GATEWAY =
+  process.env.CONTAINER_HOST_GATEWAY || detectHostGateway();
+
+function detectHostGateway(): string {
+  // Apple Container (macOS): use the bridge gateway IP
+  if (os.platform() === 'darwin') {
+    const ifaces = os.networkInterfaces();
+    // Apple Container creates a bridge0 interface with 192.168.64.1
+    const bridge = ifaces['bridge0'] || ifaces['bridge100'];
+    if (bridge) {
+      const ipv4 = bridge.find((a) => a.family === 'IPv4');
+      if (ipv4) return ipv4.address;
+    }
+    return '192.168.64.1';
+  }
+  return 'host.docker.internal';
+}
 
 /**
  * Address the credential proxy binds to.
- * Docker Desktop (macOS): 127.0.0.1 — the VM routes host.docker.internal to loopback.
- * Docker (Linux): bind to the docker0 bridge IP so only containers can reach it,
- *   falling back to 0.0.0.0 if the interface isn't found.
+ * Apple Container (macOS): bind to 0.0.0.0 — the VM bridge needs to reach us.
+ * Docker Desktop (macOS): 127.0.0.1 — Docker routes host.docker.internal to loopback.
+ * Docker (Linux): bind to the docker0 bridge IP, falling back to 0.0.0.0.
  */
 export const PROXY_BIND_HOST =
   process.env.CREDENTIAL_PROXY_HOST || detectProxyBindHost();
 
 function detectProxyBindHost(): string {
-  if (os.platform() === 'darwin') return '127.0.0.1';
+  // Apple Container: containers reach host via bridge, not loopback
+  if (os.platform() === 'darwin') return '0.0.0.0';
 
   // WSL uses Docker Desktop (same VM routing as macOS) — loopback is correct.
-  // Check /proc filesystem, not env vars — WSL_DISTRO_NAME isn't set under systemd.
   if (fs.existsSync('/proc/sys/fs/binfmt_misc/WSLInterop')) return '127.0.0.1';
 
   // Bare-metal Linux: bind to the docker0 bridge IP instead of 0.0.0.0
