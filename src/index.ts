@@ -3,7 +3,11 @@
 // - REST proxy (undici) is configured here for discord.js fetch-based requests
 import { setGlobalDispatcher, ProxyAgent as UndiciProxyAgent } from 'undici';
 
-const httpProxy = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+const httpProxy =
+  process.env.https_proxy ||
+  process.env.HTTPS_PROXY ||
+  process.env.http_proxy ||
+  process.env.HTTP_PROXY;
 if (httpProxy) {
   setGlobalDispatcher(new UndiciProxyAgent(httpProxy));
 }

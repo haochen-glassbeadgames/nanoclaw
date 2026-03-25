@@ -47,7 +47,11 @@ export function startCredentialProxy(
 
   // Route upstream requests through HTTP proxy if configured.
   // Uses HTTP CONNECT tunneling so the proxy sees the domain for rule-based routing.
-  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+  const proxyUrl =
+    process.env.https_proxy ||
+    process.env.HTTPS_PROXY ||
+    process.env.http_proxy ||
+    process.env.HTTP_PROXY;
   const upstreamAgent: HttpAgent | HttpsAgent | undefined = proxyUrl
     ? new HttpsProxyAgent(proxyUrl)
     : undefined;
