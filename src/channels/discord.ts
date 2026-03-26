@@ -375,13 +375,19 @@ export class DiscordChannel implements Channel {
     }
   }
 
-  async addReaction(jid: string, messageId: string, emoji: string): Promise<void> {
+  async addReaction(
+    jid: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
     if (!this.client) return;
     try {
       const channelId = jid.replace(/^dc:/, '');
       const channel = await this.client.channels.fetch(channelId);
       if (channel && 'messages' in channel) {
-        const message = await (channel as TextChannel).messages.fetch(messageId);
+        const message = await (channel as TextChannel).messages.fetch(
+          messageId,
+        );
         await message.react(emoji);
       }
     } catch (err) {
@@ -389,13 +395,19 @@ export class DiscordChannel implements Channel {
     }
   }
 
-  async removeReaction(jid: string, messageId: string, emoji: string): Promise<void> {
+  async removeReaction(
+    jid: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
     if (!this.client) return;
     try {
       const channelId = jid.replace(/^dc:/, '');
       const channel = await this.client.channels.fetch(channelId);
       if (channel && 'messages' in channel) {
-        const message = await (channel as TextChannel).messages.fetch(messageId);
+        const message = await (channel as TextChannel).messages.fetch(
+          messageId,
+        );
         const botReactions = message.reactions.cache.get(emoji);
         if (botReactions) await botReactions.users.remove(this.client.user!.id);
       }

@@ -2,7 +2,7 @@
  * Container Runner for NanoClaw
  * Spawns agent execution in containers and handles IPC
  */
-import { ChildProcess, exec, spawn } from 'child_process';
+import { ChildProcess, exec, execSync, spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -174,6 +174,15 @@ function buildVolumeMounts(
       readonly: false,
     });
   }
+  // GitHub CLI config (for gh commands in PM and other agents)
+  const ghConfigDir = path.join(homeDir, '.config', 'gh');
+  if (fs.existsSync(ghConfigDir)) {
+    mounts.push({
+      hostPath: ghConfigDir,
+      containerPath: '/home/node/.config/gh',
+      readonly: true,
+    });
+  }
 
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
@@ -245,6 +254,19 @@ function buildContainerArgs(
     args.push('-e', `http_proxy=http://${CONTAINER_HOST_GATEWAY}:7897`);
     args.push('-e', `HTTPS_PROXY=http://${CONTAINER_HOST_GATEWAY}:7897`);
     args.push('-e', `HTTP_PROXY=http://${CONTAINER_HOST_GATEWAY}:7897`);
+  }
+
+  // GitHub CLI token — keyring isn't available in containers, so pass the token directly.
+  // gh auth token outputs the current token from the host's credential store.
+  try {
+    const ghToken = execSync('gh auth token 2>/dev/null', {
+      encoding: 'utf-8',
+    }).trim();
+    if (ghToken) {
+      args.push('-e', `GH_TOKEN=${ghToken}`);
+    }
+  } catch {
+    /* gh not installed or not authenticated on host */
   }
 
   // Google Drive OAuth credentials for the mcp-google-drive MCP server.

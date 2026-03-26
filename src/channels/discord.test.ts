@@ -103,14 +103,24 @@ vi.mock('discord.js', () => {
   class TextChannel {}
 
   class SlashCommandBuilder {
-    setName() { return this; }
-    setDescription() { return this; }
-    toJSON() { return {}; }
+    setName() {
+      return this;
+    }
+    setDescription() {
+      return this;
+    }
+    toJSON() {
+      return {};
+    }
   }
 
   class REST {
-    setToken() { return this; }
-    setAgent() { return this; }
+    setToken() {
+      return this;
+    }
+    setAgent() {
+      return this;
+    }
     put = vi.fn().mockResolvedValue(undefined);
   }
 

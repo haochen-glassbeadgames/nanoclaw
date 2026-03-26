@@ -25,6 +25,12 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+# Install GitHub CLI from pre-downloaded tarball (builder VM has no proxy)
+COPY gh.tar.gz /tmp/gh.tar.gz
+RUN tar xzf /tmp/gh.tar.gz -C /tmp \
+    && cp /tmp/gh_*/bin/gh /usr/local/bin/gh \
+    && rm -rf /tmp/gh*
+
 # Set Chromium path for agent-browser
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
