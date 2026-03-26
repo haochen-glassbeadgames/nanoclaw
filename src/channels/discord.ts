@@ -190,52 +190,82 @@ export class DiscordChannel implements Channel {
 
     return new Promise<void>((resolve) => {
       // Handle slash commands
-      this.client!.on(Events.InteractionCreate, async (interaction: Interaction) => {
-        if (!interaction.isChatInputCommand()) return;
-        if (interaction.commandName !== 'skills') return;
+      this.client!.on(
+        Events.InteractionCreate,
+        async (interaction: Interaction) => {
+          if (!interaction.isChatInputCommand()) return;
+          if (interaction.commandName !== 'skills') return;
 
-        const chatJid = `dc:${interaction.channelId}`;
-        const group = this.opts.registeredGroups()[chatJid];
-        if (!group) {
-          await interaction.reply({ content: 'No agent is registered for this channel.', ephemeral: true });
-          return;
-        }
-
-        // Read skills from the group's session directory
-        const skillsDir = path.join(DATA_DIR, 'sessions', group.folder, '.claude', 'skills');
-        if (!fs.existsSync(skillsDir)) {
-          await interaction.reply({ content: 'No skills found for this agent.', ephemeral: true });
-          return;
-        }
-
-        const skills: string[] = [];
-        for (const file of fs.readdirSync(skillsDir)) {
-          if (!file.endsWith('.md')) continue;
-          const name = file.replace('.md', '');
-          // Read first line after frontmatter for description
-          const content = fs.readFileSync(path.join(skillsDir, file), 'utf-8');
-          const lines = content.split('\n');
-          let description = '';
-          let pastFrontmatter = false;
-          for (const line of lines) {
-            if (line.startsWith('---') && pastFrontmatter) { pastFrontmatter = false; continue; }
-            if (line.startsWith('---')) { pastFrontmatter = true; continue; }
-            if (pastFrontmatter) continue;
-            if (line.startsWith('# ')) { description = line.replace('# ', ''); break; }
+          const chatJid = `dc:${interaction.channelId}`;
+          const group = this.opts.registeredGroups()[chatJid];
+          if (!group) {
+            await interaction.reply({
+              content: 'No agent is registered for this channel.',
+              ephemeral: true,
+            });
+            return;
           }
-          skills.push(`\`/${name}\` — ${description || name}`);
-        }
 
-        if (skills.length === 0) {
-          await interaction.reply({ content: 'No skills found for this agent.', ephemeral: true });
-          return;
-        }
+          // Read skills from the group's session directory
+          const skillsDir = path.join(
+            DATA_DIR,
+            'sessions',
+            group.folder,
+            '.claude',
+            'skills',
+          );
+          if (!fs.existsSync(skillsDir)) {
+            await interaction.reply({
+              content: 'No skills found for this agent.',
+              ephemeral: true,
+            });
+            return;
+          }
 
-        await interaction.reply({
-          content: `**${group.name} — Available Skills**\n\n${skills.join('\n')}`,
-          ephemeral: true,
-        });
-      });
+          const skills: string[] = [];
+          for (const file of fs.readdirSync(skillsDir)) {
+            if (!file.endsWith('.md')) continue;
+            const name = file.replace('.md', '');
+            // Read first line after frontmatter for description
+            const content = fs.readFileSync(
+              path.join(skillsDir, file),
+              'utf-8',
+            );
+            const lines = content.split('\n');
+            let description = '';
+            let pastFrontmatter = false;
+            for (const line of lines) {
+              if (line.startsWith('---') && pastFrontmatter) {
+                pastFrontmatter = false;
+                continue;
+              }
+              if (line.startsWith('---')) {
+                pastFrontmatter = true;
+                continue;
+              }
+              if (pastFrontmatter) continue;
+              if (line.startsWith('# ')) {
+                description = line.replace('# ', '');
+                break;
+              }
+            }
+            skills.push(`\`/${name}\` — ${description || name}`);
+          }
+
+          if (skills.length === 0) {
+            await interaction.reply({
+              content: 'No skills found for this agent.',
+              ephemeral: true,
+            });
+            return;
+          }
+
+          await interaction.reply({
+            content: `**${group.name} — Available Skills**\n\n${skills.join('\n')}`,
+            ephemeral: true,
+          });
+        },
+      );
 
       this.client!.once(Events.ClientReady, async (readyClient) => {
         logger.info(
@@ -250,10 +280,14 @@ export class DiscordChannel implements Channel {
         // Register /skills slash command for all guilds the bot is in
         const command = new SlashCommandBuilder()
           .setName('skills')
-          .setDescription('List available skills for this channel\'s agent');
+          .setDescription("List available skills for this channel's agent");
 
         const rest = new REST().setToken(this.botToken);
-        const proxy = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+        const proxy =
+          process.env.https_proxy ||
+          process.env.HTTPS_PROXY ||
+          process.env.http_proxy ||
+          process.env.HTTP_PROXY;
         if (proxy) {
           rest.setAgent(new ProxyAgent(proxy));
         }
@@ -266,7 +300,10 @@ export class DiscordChannel implements Channel {
             );
             logger.debug({ guild: guild.name }, 'Registered /skills command');
           } catch (err) {
-            logger.warn({ guild: guild.name, err }, 'Failed to register slash commands');
+            logger.warn(
+              { guild: guild.name, err },
+              'Failed to register slash commands',
+            );
           }
         }
 
