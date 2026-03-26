@@ -12,6 +12,12 @@ vi.mock('../env.js', () => ({ readEnvFile: vi.fn(() => ({})) }));
 vi.mock('../config.js', () => ({
   ASSISTANT_NAME: 'Andy',
   TRIGGER_PATTERN: /^@Andy\b/i,
+  DATA_DIR: '/tmp/test-data',
+}));
+
+// Mock undici (ProxyAgent)
+vi.mock('undici', () => ({
+  ProxyAgent: vi.fn(),
 }));
 
 // Mock logger
@@ -64,12 +70,16 @@ vi.mock('discord.js', () => {
       return this.on(event, handler);
     }
 
+    guilds = {
+      cache: new Map(),
+    };
+
     async login(_token: string) {
       this._ready = true;
-      // Fire the ready event
+      // Fire the ready event (handler may be async for slash command registration)
       const readyHandlers = this.eventHandlers.get('ready') || [];
       for (const h of readyHandlers) {
-        h({ user: this.user });
+        await h({ user: this.user, guilds: this.guilds });
       }
     }
 
@@ -92,11 +102,33 @@ vi.mock('discord.js', () => {
   // Mock TextChannel type
   class TextChannel {}
 
+  class SlashCommandBuilder {
+    setName() { return this; }
+    setDescription() { return this; }
+    toJSON() { return {}; }
+  }
+
+  class REST {
+    setToken() { return this; }
+    setAgent() { return this; }
+    put = vi.fn().mockResolvedValue(undefined);
+  }
+
+  const Routes = {
+    applicationGuildCommands: vi.fn(() => '/mock-route'),
+  };
+
+  const Interaction = {};
+
   return {
     Client: MockClient,
     Events,
     GatewayIntentBits,
     TextChannel,
+    SlashCommandBuilder,
+    REST,
+    Routes,
+    Interaction,
   };
 });
 

@@ -195,6 +195,12 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   const prompt = formatMessages(missedMessages, TIMEZONE);
 
+  // Track the last user message ID for reaction status indicators
+  const triggerMessageId = missedMessages[missedMessages.length - 1].id;
+
+  // 👀 Message received/read
+  await channel.addReaction?.(chatJid, triggerMessageId, '👀');
+
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
   // these messages. Save the old cursor so we can roll back on error.
   const previousCursor = lastAgentTimestamp[chatJid] || '';
@@ -222,6 +228,8 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   };
 
   await channel.setTyping?.(chatJid, true);
+  // 🔄 Processing started
+  await channel.addReaction?.(chatJid, triggerMessageId, '🔄');
   let hadError = false;
   let outputSentToUser = false;
 
@@ -254,6 +262,14 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   await channel.setTyping?.(chatJid, false);
   if (idleTimer) clearTimeout(idleTimer);
+
+  // Remove processing indicator and set final status
+  await channel.removeReaction?.(chatJid, triggerMessageId, '🔄');
+  if (output === 'error' || hadError) {
+    await channel.addReaction?.(chatJid, triggerMessageId, '❌');
+  } else {
+    await channel.addReaction?.(chatJid, triggerMessageId, '✅');
+  }
 
   if (output === 'error' || hadError) {
     // If we already sent output to the user, don't roll back the cursor —

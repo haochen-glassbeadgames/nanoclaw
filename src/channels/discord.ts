@@ -374,6 +374,35 @@ export class DiscordChannel implements Channel {
       logger.debug({ jid, err }, 'Failed to send Discord typing indicator');
     }
   }
+
+  async addReaction(jid: string, messageId: string, emoji: string): Promise<void> {
+    if (!this.client) return;
+    try {
+      const channelId = jid.replace(/^dc:/, '');
+      const channel = await this.client.channels.fetch(channelId);
+      if (channel && 'messages' in channel) {
+        const message = await (channel as TextChannel).messages.fetch(messageId);
+        await message.react(emoji);
+      }
+    } catch (err) {
+      logger.debug({ jid, messageId, emoji, err }, 'Failed to add reaction');
+    }
+  }
+
+  async removeReaction(jid: string, messageId: string, emoji: string): Promise<void> {
+    if (!this.client) return;
+    try {
+      const channelId = jid.replace(/^dc:/, '');
+      const channel = await this.client.channels.fetch(channelId);
+      if (channel && 'messages' in channel) {
+        const message = await (channel as TextChannel).messages.fetch(messageId);
+        const botReactions = message.reactions.cache.get(emoji);
+        if (botReactions) await botReactions.users.remove(this.client.user!.id);
+      }
+    } catch (err) {
+      logger.debug({ jid, messageId, emoji, err }, 'Failed to remove reaction');
+    }
+  }
 }
 
 registerChannel('discord', (opts: ChannelOpts) => {

@@ -235,7 +235,11 @@ function buildContainerArgs(
   args.push('-e', `TZ=${TIMEZONE}`);
 
   // Forward proxy settings so MCP servers inside the container can reach external APIs
-  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+  const proxyUrl =
+    process.env.https_proxy ||
+    process.env.HTTPS_PROXY ||
+    process.env.http_proxy ||
+    process.env.HTTP_PROXY;
   if (proxyUrl) {
     args.push('-e', `https_proxy=http://${CONTAINER_HOST_GATEWAY}:7897`);
     args.push('-e', `http_proxy=http://${CONTAINER_HOST_GATEWAY}:7897`);
