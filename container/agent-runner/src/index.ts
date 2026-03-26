@@ -427,16 +427,16 @@ async function runQuery(
           },
         },
         gmail: {
-          command: 'npx',
-          args: ['-y', '@gongrzhe/server-gmail-autoauth-mcp'],
+          command: 'gmail-mcp',
+          args: [],
         },
         google_calendar: {
-          command: 'npx',
-          args: ['-y', '@gongrzhe/server-calendar-autoauth-mcp'],
+          command: 'server-calendar-autoauth-mcp',
+          args: [],
         },
         google_drive: {
-          command: 'npx',
-          args: ['-y', 'mcp-google-drive'],
+          command: 'mcp-google-drive',
+          args: [],
           env: {
             GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
             GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
@@ -507,6 +507,67 @@ async function main(): Promise<void> {
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const mcpServerPath = path.join(__dirname, 'ipc-mcp-stdio.js');
+
+  // Write .mcp.json to the working directory so Claude Code discovers MCP servers
+  // via its standard file-based discovery (belt-and-suspenders alongside SDK mcpServers).
+  const mcpConfig: Record<string, object> = {
+    nanoclaw: {
+      type: 'stdio',
+      command: 'node',
+      args: [mcpServerPath],
+      env: {
+        NANOCLAW_CHAT_JID: containerInput.chatJid,
+        NANOCLAW_GROUP_FOLDER: containerInput.groupFolder,
+        NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
+      },
+    },
+  };
+  // Gmail MCP (globally installed in container image)
+  if (fs.existsSync('/home/node/.gmail-mcp/credentials.json')) {
+    mcpConfig.gmail = {
+      type: 'stdio',
+      command: 'server-gmail-autoauth-mcp',
+      args: [],
+    };
+  }
+  // Google Calendar MCP (globally installed in container image)
+  if (fs.existsSync('/home/node/.calendar-mcp/credentials.json')) {
+    mcpConfig.google_calendar = {
+      type: 'stdio',
+      command: 'server-calendar-autoauth-mcp',
+      args: [],
+    };
+  }
+  // Google Drive MCP (globally installed in container image)
+  if (process.env.GOOGLE_DRIVE_REFRESH_TOKEN) {
+    mcpConfig.google_drive = {
+      type: 'stdio',
+      command: 'mcp-google-drive',
+      args: [],
+      env: {
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+        GOOGLE_REFRESH_TOKEN: process.env.GOOGLE_DRIVE_REFRESH_TOKEN || '',
+      },
+    };
+  }
+  // Write to working directory (project scope) — needs git repo to be detected
+  fs.writeFileSync('/workspace/group/.mcp.json', JSON.stringify({ mcpServers: mcpConfig }, null, 2));
+
+  // Ensure working directory is a git repo so Claude Code recognizes it as a project root
+  if (!fs.existsSync('/workspace/group/.git')) {
+    try {
+      const { execSync } = await import('child_process');
+      execSync('git init', { cwd: '/workspace/group', stdio: 'pipe' });
+    } catch { /* ignore */ }
+  }
+
+  // Also write to user-level .claude.json so Claude Code discovers MCP servers at user scope
+  const claudeJsonPath = path.join(process.env.HOME || '/home/node', '.claude.json');
+  let claudeJson: Record<string, unknown> = {};
+  try { claudeJson = JSON.parse(fs.readFileSync(claudeJsonPath, 'utf-8')); } catch { /* new file */ }
+  claudeJson.mcpServers = mcpConfig;
+  fs.writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2));
 
   let sessionId = containerInput.sessionId;
   fs.mkdirSync(IPC_INPUT_DIR, { recursive: true });

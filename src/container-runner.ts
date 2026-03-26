@@ -234,13 +234,30 @@ function buildContainerArgs(
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
 
+  // Forward proxy settings so MCP servers inside the container can reach external APIs
+  const proxyUrl = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+  if (proxyUrl) {
+    args.push('-e', `https_proxy=http://${CONTAINER_HOST_GATEWAY}:7897`);
+    args.push('-e', `http_proxy=http://${CONTAINER_HOST_GATEWAY}:7897`);
+    args.push('-e', `HTTPS_PROXY=http://${CONTAINER_HOST_GATEWAY}:7897`);
+    args.push('-e', `HTTP_PROXY=http://${CONTAINER_HOST_GATEWAY}:7897`);
+  }
+
   // Google Drive OAuth credentials for the mcp-google-drive MCP server.
   // Read from the host credentials file so containers don't need direct .env access.
-  const driveCredsPath = path.join(os.homedir(), '.google-drive-mcp', 'credentials.json');
+  const driveCredsPath = path.join(
+    os.homedir(),
+    '.google-drive-mcp',
+    'credentials.json',
+  );
   if (fs.existsSync(driveCredsPath)) {
     try {
       const driveCreds = JSON.parse(fs.readFileSync(driveCredsPath, 'utf-8'));
-      const oauthKeysPath = path.join(os.homedir(), '.gmail-mcp', 'gcp-oauth.keys.json');
+      const oauthKeysPath = path.join(
+        os.homedir(),
+        '.gmail-mcp',
+        'gcp-oauth.keys.json',
+      );
       if (fs.existsSync(oauthKeysPath)) {
         const oauthKeys = JSON.parse(fs.readFileSync(oauthKeysPath, 'utf-8'));
         const k = oauthKeys.installed || oauthKeys.web;
@@ -248,9 +265,14 @@ function buildContainerArgs(
         args.push('-e', `GOOGLE_CLIENT_SECRET=${k.client_secret}`);
       }
       if (driveCreds.refresh_token) {
-        args.push('-e', `GOOGLE_DRIVE_REFRESH_TOKEN=${driveCreds.refresh_token}`);
+        args.push(
+          '-e',
+          `GOOGLE_DRIVE_REFRESH_TOKEN=${driveCreds.refresh_token}`,
+        );
       }
-    } catch { /* ignore read errors */ }
+    } catch {
+      /* ignore read errors */
+    }
   }
 
   // Route API traffic through the credential proxy (containers never see real secrets)
